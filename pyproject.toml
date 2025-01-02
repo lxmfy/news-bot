@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "lxmfy-news-bot"
-version = "0.1.0"
+version = "0.1.1"
 description = "LXMFy News Bot using RSS and trafilatura to fetch full-text"
 authors = ["Ivan"]
 readme = "README.md"

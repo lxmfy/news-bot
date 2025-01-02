@@ -12,9 +12,21 @@ class FeedManager:
     def __init__(self):
         self.thread_local = threading.local()
         
-        # Get paths from environment variables with defaults
-        self.data_dir = os.getenv("DATA_DIR", "/app/data")
-        self.backup_dir = os.getenv("BACKUP_DIR", "/app/backups")
+        # Get paths from environment variables with fallbacks to user directories
+        home = os.path.expanduser("~")
+        
+        # Platform-specific default paths
+        if os.name == 'nt':  # Windows
+            default_data_dir = os.path.join(os.getenv('APPDATA'), "lxmfy-news-bot")
+        elif os.name == 'darwin':  # macOS
+            default_data_dir = os.path.join(home, "Library", "Application Support", "lxmfy-news-bot")
+        else:  # Linux and others
+            default_data_dir = os.path.join(home, ".local", "share", "lxmfy-news-bot")
+        
+        default_backup_dir = os.path.join(default_data_dir, "backups")
+        
+        self.data_dir = os.getenv("DATA_DIR", default_data_dir)
+        self.backup_dir = os.getenv("BACKUP_DIR", default_backup_dir)
         self.config_dir = os.getenv("CONFIG_DIR", os.path.dirname(os.path.abspath(__file__)))
         
         # Ensure directories exist

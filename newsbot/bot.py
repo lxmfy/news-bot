@@ -12,7 +12,20 @@ class NewsBot:
     DESCRIPTION = "LXMFy News Bot\nUsing RSS and trafilatura to fetch full-text"
 
     def __init__(self):
-        # Get configuration from environment variables
+        # Get configuration from environment variables with platform-specific defaults
+        home = os.path.expanduser("~")
+        
+        # Platform-specific reticulum paths
+        if os.name == 'nt':  # Windows
+            reticulum_dir = os.path.join(os.getenv('APPDATA'), "reticulum")
+        elif os.name == 'darwin':  # macOS
+            reticulum_dir = os.path.join(home, "Library", "Application Support", "reticulum")
+        else:  # Linux and others
+            reticulum_dir = os.path.join(home, ".reticulum")
+        
+        os.makedirs(reticulum_dir, exist_ok=True)
+        
+        # Initialize LXMFBot with environment variables
         self.bot = LXMFBot(
             name=os.getenv("BOT_NAME", f"LXMFy News Bot v{self.VERSION}"),
             announce=int(os.getenv("BOT_ANNOUNCE", "600")),

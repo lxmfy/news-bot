@@ -2,11 +2,18 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-RUN mkdir -p /app/data /app/backups
+# Create directories for data persistence
+RUN mkdir -p /app/data /app/backups /root/.reticulum
 
+# Install the package
 RUN pip install lxmfy-news-bot
 
-VOLUME ["/app/data", "/app/backups"]
+# Set volumes for data persistence
+VOLUME ["/app/data", "/app/backups", "/root/.reticulum"]
+
+# Set environment variables
+ENV DATA_DIR=/app/data \
+    BACKUP_DIR=/app/backups
 
 WORKDIR /app/data
 
