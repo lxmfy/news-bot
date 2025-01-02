@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "lxmfy-news-bot"
+version = "0.1.0"
+description = "LXMFy News Bot using RSS and trafilatura to fetch full-text"
+authors = ["Ivan"]
+readme = "README.md"
+packages = [{include = "newsbot"}]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+feedparser = "^6.0.11"
+trafilatura = "^2.0.0"
+lxmfy = "^0.4.2"
+pytz = "^2024.2"
+pyyaml = "^6.0.2"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.8.4"
+bandit = "^1.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+lxmfy-news-bot = "newsbot.bot:main"

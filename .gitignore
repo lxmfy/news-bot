@@ -169,3 +169,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+.ruff_cache/
+feed.db
+config/
+data/

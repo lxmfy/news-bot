@@ -1,0 +1,54 @@
+# Default feed groups
+groups:
+  news:
+    - name: Reuters World
+      url: https://www.reutersagency.com/feed/?best-topics=all&post_type=best
+    - name: Associated Press
+      url: https://feeds.apnews.com/apf-topnews
+    - name: BBC News
+      url: http://feeds.bbci.co.uk/news/world/rss.xml
+
+  military:
+    - name: Task & Purpose
+      url: https://taskandpurpose.com/feed
+    - name: Military Times
+      url: https://www.militarytimes.com/arc/outboundfeeds/rss/?outputType=xml
+    - name: Defense One
+      url: https://www.defenseone.com/rss/
+    
+  cybersecurity:
+    - name: The Hacker News
+      url: https://feeds.feedburner.com/TheHackersNews
+    - name: Krebs on Security
+      url: https://krebsonsecurity.com/feed/
+    - name: Bleeping Computer
+      url: https://www.bleepingcomputer.com/feed/
+
+  science:
+    - name: Science Daily
+      url: https://www.sciencedaily.com/rss/all.xml
+    - name: Nature
+      url: http://feeds.nature.com/nature/rss/current
+    - name: New Scientist
+      url: https://www.newscientist.com/feed/home/
+
+# Individual feeds for direct access
+feeds:
+  "task and purpose":
+    name: Task & Purpose
+    url: https://taskandpurpose.com/feed
+  
+  "the hacker news":
+    name: The Hacker News
+    url: https://feeds.feedburner.com/TheHackersNews
+
+# Mixed selection of top feeds
+default:
+  - name: Reuters World
+    url: https://www.reutersagency.com/feed/?best-topics=all&post_type=best
+  - name: Task & Purpose
+    url: https://taskandpurpose.com/feed
+  - name: The Hacker News
+    url: https://feeds.feedburner.com/TheHackersNews
+  - name: Science Daily
+    url: https://www.sciencedaily.com/rss/all.xml 
