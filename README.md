@@ -1,6 +1,6 @@
 # news-bot
 
-Get your daily RSS full-text feeds. 
+A LXMFy News Bot for the Reticulum Network. Get your daily RSS full-text feeds. 
 
 ## Installation
 
@@ -28,9 +28,7 @@ docker run -d \
   -v /path/to/backups:/app/backups \
   -e BOT_NAME="My News Bot" \
   -e BOT_ADMINS="admin1hash,admin2hash" \
-  lxmfy-news-bot
+  ghcr.io/lxmfy/news-bot:latest
 ```
-
-
 
 
