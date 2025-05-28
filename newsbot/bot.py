@@ -1,14 +1,13 @@
 from lxmfy import LXMFBot
+from lxmfy.scheduler import TaskScheduler
 import pytz
 from datetime import datetime, timezone
-import threading
-import time
 import os
 from .feed import FeedManager
 
 
 class NewsBot:
-    VERSION = "0.1.0"
+    VERSION = "0.2.0"
     DESCRIPTION = "LXMFy News Bot\nUsing RSS and trafilatura to fetch full-text"
 
     def __init__(self):
@@ -29,21 +28,33 @@ class NewsBot:
         self.bot = LXMFBot(
             name=os.getenv("BOT_NAME", f"LXMFy News Bot v{self.VERSION}"),
             announce=int(os.getenv("BOT_ANNOUNCE", "600")),
-            admins=os.getenv("BOT_ADMINS", "").split(","),
+            announce_immediately=os.getenv("BOT_ANNOUNCE_IMMEDIATE", "false").lower() == "true",
+            admins=set(os.getenv("BOT_ADMINS", "").split(",")) if os.getenv("BOT_ADMINS") else set(),
             command_prefix=os.getenv("BOT_PREFIX", ""),
             hot_reloading=os.getenv("BOT_HOT_RELOAD", "false").lower() == "true",
-            announce_immediately=os.getenv("BOT_ANNOUNCE_IMMEDIATE", "false").lower() == "true",
             rate_limit=int(os.getenv("BOT_RATE_LIMIT", "8")),
             cooldown=int(os.getenv("BOT_COOLDOWN", "1")),
             max_warnings=int(os.getenv("BOT_MAX_WARNINGS", "3")),
             warning_timeout=int(os.getenv("BOT_WARNING_TIMEOUT", "300")),
+            permissions_enabled=os.getenv("BOT_PERMISSIONS_ENABLED", "false").lower() == "true",
+            storage_type=os.getenv("BOT_STORAGE_TYPE", "sqlite"),
+            storage_path=os.getenv("BOT_STORAGE_PATH", f"{os.getenv('DATA_DIR', './app/data')}/bot.db"),
+            first_message_enabled=os.getenv("BOT_FIRST_MESSAGE_ENABLED", "true").lower() == "true",
+            event_logging_enabled=os.getenv("BOT_EVENT_LOGGING_ENABLED", "false").lower() == "true",
+            max_logged_events=int(os.getenv("BOT_MAX_LOGGED_EVENTS", "1000")),
+            event_middleware_enabled=os.getenv("BOT_EVENT_MIDDLEWARE_ENABLED", "false").lower() == "true",
+            announce_enabled=os.getenv("BOT_ANNOUNCE_ENABLED", "true").lower() == "true",
         )
 
         self.feed_manager = FeedManager()
         self.setup_commands()
 
-        self.checker_thread = threading.Thread(target=self.check_feeds, daemon=True)
-        self.checker_thread.start()
+        # Initialize and start the task scheduler for periodic feed checking
+        self.scheduler = TaskScheduler(self.bot)
+        @self.scheduler.schedule(name="feed_check", cron_expr="*/5 * * * *")
+        def scheduled_feed_check():
+            self._run_feed_cycle()
+        self.scheduler.start()
 
     def setup_commands(self):
         # Admin commands
@@ -170,6 +181,29 @@ Link: {entry['link']}"""
         def subscribe(ctx):
             if len(ctx.args) < 1:
                 ctx.reply("Usage: subscribe <feed_url> [name] [feed_url2] [name2] ...")
+                return
+
+            # If first argument isn't a URL, treat as category or named feeds
+            first_arg = ctx.args[0]
+            if not first_arg.startswith(("http://", "https://", "feed://")):
+                category = " ".join(ctx.args).lower()
+                feeds = self.feed_manager.parse_feed_input(category)
+                if not feeds:
+                    categories = list(self.feed_manager.feed_config.get("groups", {}).keys())
+                    ctx.reply(f"Category '{category}' not found. Available categories: {', '.join(categories)}")
+                    return
+                success, results = self.feed_manager.add_subscription(
+                    ctx.sender,
+                    [f["url"] for f in feeds],
+                    [f["name"] for f in feeds],
+                )
+                response = []
+                for url, ok, msg in results:
+                    if ok:
+                        response.append(f"✓ Subscribed to: {msg}")
+                    else:
+                        response.append(f"✗ Failed to subscribe to {url}: {msg}")
+                ctx.reply("\n".join(response))
                 return
 
             urls = []
@@ -379,43 +413,36 @@ Link: {entry['link']}"""
             self.feed_manager.update_user_schedule(ctx.sender, hours)
             ctx.reply(f"Updates scheduled every {hours} hours")
 
-    def check_feeds(self):
-        while True:
-            try:
-                now = datetime.now(timezone.utc)
-                for (
-                    user_hash,
-                    tz,
-                    update_time,
-                    feed_id,
-                    feed_url,
-                    feed_name,
-                    schedule_hours,
-                    last_update,
-                ) in self.feed_manager.get_active_subscriptions():
-                    # Skip if no last update (new user)
-                    if not last_update:
-                        self.send_feed_updates(user_hash, feed_id, feed_url, feed_name)
-                        continue
+    def _run_feed_cycle(self):
+        try:
+            now = datetime.now(timezone.utc)
+            for (
+                user_hash,
+                tz,
+                update_time,
+                feed_id,
+                feed_url,
+                feed_name,
+                schedule_hours,
+                last_update,
+            ) in self.feed_manager.get_active_subscriptions():
+                # Skip if no last update (new user)
+                if not last_update:
+                    self.send_feed_updates(user_hash, feed_id, feed_url, feed_name)
+                    continue
 
-                    # last_update should already be timezone-aware from get_active_subscriptions
-                    if not last_update.tzinfo:
-                        last_update = last_update.replace(tzinfo=timezone.utc)
+                # last_update should already be timezone-aware
+                if not last_update.tzinfo:
+                    last_update = last_update.replace(tzinfo=timezone.utc)
 
-                    # Calculate hours since last update
-                    hours_since_update = (now - last_update).total_seconds() / 3600
+                # Calculate hours since last update
+                hours_since_update = (now - last_update).total_seconds() / 3600
 
-                    # Check if it's time for an update
-                    if hours_since_update >= (
-                        schedule_hours or 24
-                    ):  # Default to 24 if not set
-                        self.send_feed_updates(user_hash, feed_id, feed_url, feed_name)
-
-                time.sleep(300)  # Check every 5 minutes
-
-            except Exception as e:
-                print(f"Feed checker error: {str(e)}")
-                time.sleep(60)
+                # Check if it's time for an update
+                if hours_since_update >= (schedule_hours or 24):
+                    self.send_feed_updates(user_hash, feed_id, feed_url, feed_name)
+        except Exception as e:
+            print(f"Scheduled feed check error: {str(e)}")
 
     def send_feed_updates(self, user_hash, feed_id, feed_url, feed_name):
         try:

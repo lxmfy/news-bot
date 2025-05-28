@@ -1,7 +1,6 @@
 import sqlite3
 import feedparser
 import trafilatura
-import pytz
 from datetime import datetime, timezone
 import threading
 import yaml
@@ -402,20 +401,34 @@ class FeedManager:
         return self.feed_config["default"]
 
     def parse_feed_input(self, input_str):
-        """Parse user input for feeds"""
-        if not input_str:
+        """Parse user input for feeds or categories."""
+        # Default if empty or explicit 'default'
+        if not input_str or input_str.lower() == "default":
             return self.get_default_feeds()
 
-        # Check for group names
-        if input_str.lower() in self.feed_config["groups"]:
-            return self.get_feed_group(input_str)
+        cfg = self.feed_config or {}
+        key = input_str.lower()
 
-        # Check for specific named feeds
-        if input_str.lower() in self.feed_config["feeds"]:
-            return self.get_named_feed(input_str)
+        # Exact group name
+        if key in cfg.get("groups", {}):
+            return cfg["groups"][key]
 
-        # Split by comma or space and look for multiple feeds
-        feed_names
+        # Exact named feed
+        if key in cfg.get("feeds", {}):
+            return [cfg["feeds"][key]]
+
+        # Split by commas or whitespace for multiple entries
+        tokens = input_str.replace(",", " ").split()
+        feeds = []
+        for token in tokens:
+            k = token.lower()
+            if k in cfg.get("groups", {}):
+                feeds.extend(cfg["groups"][k])
+            elif k in cfg.get("feeds", {}):
+                feeds.append(cfg["feeds"][k])
+
+        # Return feeds list or None if nothing found
+        return feeds if feeds else None
 
     def update_user_schedule(self, user_hash, hours):
         """Update user's schedule in hours"""
