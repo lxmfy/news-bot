@@ -1,5 +1,5 @@
-feedparser
-trafilatura
-pytz
-lxmfy
-pyyaml
+feedparser==6.0.11
+trafilatura==2.0.0
+lxmfy==0.7.3
+pytz==2025.2
+pyyaml==6.0.2
