@@ -277,7 +277,8 @@ class FeedManager:
         )
         self.get_db().commit()
 
-    def process_feed(self, feed_url):
+    @staticmethod
+    def process_feed(feed_url):
         """Process a feed and return formatted entries"""
         try:
             feed = feedparser.parse(feed_url)
@@ -308,8 +309,9 @@ class FeedManager:
         )
         self.get_db().commit()
 
-    def is_sent(self, feed_id, item_id):
+    def is_sent(self, feed_id, item_id):  # noqa: PYL-R0201
         """Check if an item was already sent"""
+        # This method uses self.get_db() and thus cannot be a static method.
         cursor = self.get_db().cursor()
         cursor.execute(
             """

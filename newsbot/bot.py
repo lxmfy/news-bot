@@ -346,6 +346,8 @@ Link: {entry["link"]}"""
                 return
 
             try:
+                # Validate time format to HH:MM. The underlying update_user_time
+                # function uses parameterized queries, preventing SQL injection.
                 time = datetime.strptime(ctx.args[0], "%H:%M").strftime("%H:%M")
                 self.feed_manager.update_user_time(ctx.sender, time)
                 ctx.reply(f"Update time set to: {time}")
