@@ -1,22 +1,21 @@
 [tool.poetry]
 name = "lxmfy-news-bot"
-version = "0.2.0"
+version = "0.3.0"
 description = "LXMFy News Bot using RSS and trafilatura to fetch full-text"
 authors = ["Ivan"]
 readme = "README.md"
 packages = [{include = "newsbot"}]
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = "^3.11"
 feedparser = "^6.0.11"
 trafilatura = "^2.0.0"
-lxmfy = "^0.7.3"
+lxmfy = "^0.7.7"
 pytz = "^2025.2"
 pyyaml = "^6.0.2"
 
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.11.11"
-bandit = "^1.8.3"
+ruff = "^0.12.3"
 
 [build-system]
 requires = ["poetry-core"]
