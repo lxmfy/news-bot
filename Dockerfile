@@ -1,17 +1,22 @@
-FROM python:3.13-slim
+ARG PYTHON_VERSION=3.13
+FROM python:${PYTHON_VERSION}-alpine
+
+LABEL org.opencontainers.image.source="https://github.com/lxmfy/news-bot"
+LABEL org.opencontainers.image.description="Get your daily RSS full-text feeds."
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.authors="LXMFy"
 
 WORKDIR /app
 
-# Create directories for data persistence
 RUN mkdir -p /app/data /app/backups /root/.reticulum
 
-# Install the package
-RUN pip install lxmfy-news-bot
+COPY pyproject.toml poetry.lock /app/
+RUN pip install poetry && poetry install --no-root
+COPY newsbot /app/newsbot
+RUN poetry install --no-root
 
-# Set volumes for data persistence
 VOLUME ["/app/data", "/app/backups", "/root/.reticulum"]
 
-# Set environment variables
 ENV DATA_DIR=/app/data \
     BACKUP_DIR=/app/backups
 
