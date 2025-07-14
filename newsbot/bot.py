@@ -9,7 +9,7 @@ from .feed import FeedManager
 
 
 class NewsBot:
-    VERSION = "0.2.0"
+    VERSION = "0.3.0"
     DESCRIPTION = "LXMFy News Bot\nUsing RSS and trafilatura to fetch full-text"
 
     def __init__(self):
