@@ -1,8 +1,10 @@
+import os
+from datetime import datetime, timezone
+
+import pytz
 from lxmfy import LXMFBot
 from lxmfy.scheduler import TaskScheduler
-import pytz
-from datetime import datetime, timezone
-import os
+
 from .feed import FeedManager
 
 
@@ -13,37 +15,53 @@ class NewsBot:
     def __init__(self):
         # Get configuration from environment variables with platform-specific defaults
         home = os.path.expanduser("~")
-        
+
         # Platform-specific reticulum paths
-        if os.name == 'nt':  # Windows
-            reticulum_dir = os.path.join(os.getenv('APPDATA'), "reticulum")
-        elif os.name == 'darwin':  # macOS
-            reticulum_dir = os.path.join(home, "Library", "Application Support", "reticulum")
+        if os.name == "nt":  # Windows
+            reticulum_dir = os.path.join(os.getenv("APPDATA"), "reticulum")
+        elif os.name == "darwin":  # macOS
+            reticulum_dir = os.path.join(
+                home, "Library", "Application Support", "reticulum"
+            )
         else:  # Linux and others
             reticulum_dir = os.path.join(home, ".reticulum")
-        
+
         os.makedirs(reticulum_dir, exist_ok=True)
-        
+
         # Initialize LXMFBot with environment variables
         self.bot = LXMFBot(
             name=os.getenv("BOT_NAME", f"LXMFy News Bot v{self.VERSION}"),
             announce=int(os.getenv("BOT_ANNOUNCE", "600")),
-            announce_immediately=os.getenv("BOT_ANNOUNCE_IMMEDIATE", "false").lower() == "true",
-            admins=set(os.getenv("BOT_ADMINS", "").split(",")) if os.getenv("BOT_ADMINS") else set(),
+            announce_immediately=os.getenv("BOT_ANNOUNCE_IMMEDIATE", "false").lower()
+            == "true",
+            admins=set(os.getenv("BOT_ADMINS", "").split(","))
+            if os.getenv("BOT_ADMINS")
+            else set(),
             command_prefix=os.getenv("BOT_PREFIX", ""),
             hot_reloading=os.getenv("BOT_HOT_RELOAD", "false").lower() == "true",
             rate_limit=int(os.getenv("BOT_RATE_LIMIT", "8")),
             cooldown=int(os.getenv("BOT_COOLDOWN", "1")),
             max_warnings=int(os.getenv("BOT_MAX_WARNINGS", "3")),
             warning_timeout=int(os.getenv("BOT_WARNING_TIMEOUT", "300")),
-            permissions_enabled=os.getenv("BOT_PERMISSIONS_ENABLED", "false").lower() == "true",
+            permissions_enabled=os.getenv("BOT_PERMISSIONS_ENABLED", "false").lower()
+            == "true",
             storage_type=os.getenv("BOT_STORAGE_TYPE", "sqlite"),
-            storage_path=os.getenv("BOT_STORAGE_PATH", f"{os.getenv('DATA_DIR', './app/data')}/bot.db"),
-            first_message_enabled=os.getenv("BOT_FIRST_MESSAGE_ENABLED", "true").lower() == "true",
-            event_logging_enabled=os.getenv("BOT_EVENT_LOGGING_ENABLED", "false").lower() == "true",
+            storage_path=os.getenv(
+                "BOT_STORAGE_PATH", f"{os.getenv('DATA_DIR', './app/data')}/bot.db"
+            ),
+            first_message_enabled=os.getenv("BOT_FIRST_MESSAGE_ENABLED", "true").lower()
+            == "true",
+            event_logging_enabled=os.getenv(
+                "BOT_EVENT_LOGGING_ENABLED", "false"
+            ).lower()
+            == "true",
             max_logged_events=int(os.getenv("BOT_MAX_LOGGED_EVENTS", "1000")),
-            event_middleware_enabled=os.getenv("BOT_EVENT_MIDDLEWARE_ENABLED", "false").lower() == "true",
-            announce_enabled=os.getenv("BOT_ANNOUNCE_ENABLED", "true").lower() == "true",
+            event_middleware_enabled=os.getenv(
+                "BOT_EVENT_MIDDLEWARE_ENABLED", "false"
+            ).lower()
+            == "true",
+            announce_enabled=os.getenv("BOT_ANNOUNCE_ENABLED", "true").lower()
+            == "true",
         )
 
         self.feed_manager = FeedManager()
@@ -51,9 +69,11 @@ class NewsBot:
 
         # Initialize and start the task scheduler for periodic feed checking
         self.scheduler = TaskScheduler(self.bot)
+
         @self.scheduler.schedule(name="feed_check", cron_expr="*/5 * * * *")
         def scheduled_feed_check():
             self._run_feed_cycle()
+
         self.scheduler.start()
 
     def setup_commands(self):
@@ -116,10 +136,10 @@ class NewsBot:
         def show_stats(ctx):
             stats = self.feed_manager.get_stats()
             ctx.reply(f"""Bot Statistics:
-Total users: {stats['users']}
-Total feeds: {stats['feeds']}
-Total articles: {stats['articles']}
-Database size: {stats['db_size']}MB""")
+Total users: {stats["users"]}
+Total feeds: {stats["feeds"]}
+Total articles: {stats["articles"]}
+Database size: {stats["db_size"]}MB""")
 
         # Regular user commands remain unchanged
         @self.bot.command(
@@ -150,21 +170,21 @@ Type 'feeds' to see available feed categories""")
                 ctx.reply(f"Error: {error}")
                 return
 
-            ctx.reply(f"""Feed Preview: {feed_info['title']}
+            ctx.reply(f"""Feed Preview: {feed_info["title"]}
 
-Description: {feed_info['description']}
-URL: {feed_info['link']}
+Description: {feed_info["description"]}
+URL: {feed_info["link"]}
 
 Showing latest 5 entries:""")
 
             for entry in feed_info["entries"]:
                 message = f"""
-{entry['title']}
-Published: {entry['published']}
+{entry["title"]}
+Published: {entry["published"]}
 
-{entry['description']}
+{entry["description"]}
 
-Link: {entry['link']}"""
+Link: {entry["link"]}"""
 
                 ctx.reply(message, title=f"Preview: {feed_info['title']}")
 
@@ -189,8 +209,12 @@ Link: {entry['link']}"""
                 category = " ".join(ctx.args).lower()
                 feeds = self.feed_manager.parse_feed_input(category)
                 if not feeds:
-                    categories = list(self.feed_manager.feed_config.get("groups", {}).keys())
-                    ctx.reply(f"Category '{category}' not found. Available categories: {', '.join(categories)}")
+                    categories = list(
+                        self.feed_manager.feed_config.get("groups", {}).keys()
+                    )
+                    ctx.reply(
+                        f"Category '{category}' not found. Available categories: {', '.join(categories)}"
+                    )
                     return
                 success, results = self.feed_manager.add_subscription(
                     ctx.sender,
@@ -454,11 +478,11 @@ Link: {entry['link']}"""
                     message = f"""
 {feed_name}
 
-{entry['title']}
+{entry["title"]}
 
-{entry['description']}
+{entry["description"]}
 
-Link: {entry['link']}
+Link: {entry["link"]}
 """
                     self.bot.send(user_hash, message, title=f"News: {feed_name}")
                     self.feed_manager.mark_sent(feed_id, entry["id"])
@@ -468,8 +492,8 @@ Link: {entry['link']}
                 cursor = self.feed_manager.get_db().cursor()
                 cursor.execute(
                     """
-                    UPDATE users 
-                    SET last_update = ? 
+                    UPDATE users
+                    SET last_update = ?
                     WHERE hash = ?
                 """,
                     (datetime.now(timezone.utc), user_hash),
