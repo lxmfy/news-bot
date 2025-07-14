@@ -1,37 +1,42 @@
+import os
 import sqlite3
+import threading
+from datetime import datetime, timezone
+
 import feedparser
 import trafilatura
-from datetime import datetime, timezone
-import threading
 import yaml
-import os
 
 
 class FeedManager:
     def __init__(self):
         self.thread_local = threading.local()
-        
+
         # Get paths from environment variables with fallbacks to user directories
         home = os.path.expanduser("~")
-        
+
         # Platform-specific default paths
-        if os.name == 'nt':  # Windows
-            default_data_dir = os.path.join(os.getenv('APPDATA'), "lxmfy-news-bot")
-        elif os.name == 'darwin':  # macOS
-            default_data_dir = os.path.join(home, "Library", "Application Support", "lxmfy-news-bot")
+        if os.name == "nt":  # Windows
+            default_data_dir = os.path.join(os.getenv("APPDATA"), "lxmfy-news-bot")
+        elif os.name == "darwin":  # macOS
+            default_data_dir = os.path.join(
+                home, "Library", "Application Support", "lxmfy-news-bot"
+            )
         else:  # Linux and others
             default_data_dir = os.path.join(home, ".local", "share", "lxmfy-news-bot")
-        
+
         default_backup_dir = os.path.join(default_data_dir, "backups")
-        
+
         self.data_dir = os.getenv("DATA_DIR", default_data_dir)
         self.backup_dir = os.getenv("BACKUP_DIR", default_backup_dir)
-        self.config_dir = os.getenv("CONFIG_DIR", os.path.dirname(os.path.abspath(__file__)))
-        
+        self.config_dir = os.getenv(
+            "CONFIG_DIR", os.path.dirname(os.path.abspath(__file__))
+        )
+
         # Ensure directories exist
         os.makedirs(self.data_dir, exist_ok=True)
         os.makedirs(self.backup_dir, exist_ok=True)
-        
+
         self.get_db()
         self.setup_database()
         self.load_feed_config()
@@ -67,7 +72,7 @@ class FeedManager:
                 name TEXT NOT NULL,
                 last_check TIMESTAMP
             );
-            
+
             CREATE TABLE IF NOT EXISTS users (
                 hash TEXT PRIMARY KEY,
                 timezone TEXT DEFAULT 'UTC',
@@ -76,7 +81,7 @@ class FeedManager:
                 last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 active BOOLEAN DEFAULT 1
             );
-            
+
             CREATE TABLE IF NOT EXISTS subscriptions (
                 user_hash TEXT,
                 feed_id INTEGER,
@@ -84,7 +89,7 @@ class FeedManager:
                 FOREIGN KEY(feed_id) REFERENCES feeds(id),
                 PRIMARY KEY(user_hash, feed_id)
             );
-            
+
             CREATE TABLE IF NOT EXISTS sent_items (
                 id INTEGER PRIMARY KEY,
                 feed_id INTEGER,
@@ -113,7 +118,11 @@ class FeedManager:
                     "INSERT INTO schema_version (version) VALUES (?)", (version,)
                 )
                 print(f"Applied database migration version {version}")
-            except Exception as e:
+            except Exception as e:  # noqa: PERF203
+                # The try-except block is intentionally inside the loop
+                # to ensure transactional integrity for each migration.
+                # If a migration fails, the transaction is rolled back,
+                # and the error is propagated.
                 print(f"Error applying migration {version}: {e}")
                 self.get_db().rollback()
                 raise
@@ -124,12 +133,12 @@ class FeedManager:
         """Get all active user subscriptions"""
         cursor = self.get_db().cursor()
         cursor.execute("""
-            SELECT 
-                u.hash, 
-                u.timezone, 
-                u.update_time, 
-                f.id, 
-                f.url, 
+            SELECT
+                u.hash,
+                u.timezone,
+                u.update_time,
+                f.id,
+                f.url,
                 f.name,
                 COALESCE(u.schedule_hours, 24) as schedule_hours,
                 COALESCE(u.last_update, datetime('now')) as last_update
@@ -220,8 +229,8 @@ class FeedManager:
         cursor = self.get_db().cursor()
         cursor.execute(
             """
-            DELETE FROM subscriptions 
-            WHERE user_hash = ? AND feed_id IN 
+            DELETE FROM subscriptions
+            WHERE user_hash = ? AND feed_id IN
                 (SELECT id FROM feeds WHERE name = ?)
         """,
             (user_hash, feed_name),
@@ -236,7 +245,7 @@ class FeedManager:
         cursor = self.get_db().cursor()
         cursor.execute(
             """
-            SELECT f.name, f.url 
+            SELECT f.name, f.url
             FROM feeds f
             JOIN subscriptions s ON f.id = s.feed_id
             WHERE s.user_hash = ?
@@ -273,20 +282,15 @@ class FeedManager:
         try:
             feed = feedparser.parse(feed_url)
 
-            entries = []
-            for entry in feed.entries[:5]:
-                entries.append(
-                    {
-                        "title": entry.get("title", "No title"),
-                        "description": entry.get("description", "No description"),
-                        "link": entry.get("link", "No link"),
-                        "id": entry.get(
-                            "id", entry.get("link", entry.get("title", ""))
-                        ),
-                    }
-                )
-
-            return entries
+            return [
+                {
+                    "title": entry.get("title", "No title"),
+                    "description": entry.get("description", "No description"),
+                    "link": entry.get("link", "No link"),
+                    "id": entry.get("id", entry.get("link", entry.get("title", ""))),
+                }
+                for entry in feed.entries[:5]
+            ]
 
         except Exception as e:
             print(f"Feed processing error for {feed_url}: {str(e)}")
@@ -309,7 +313,7 @@ class FeedManager:
         cursor = self.get_db().cursor()
         cursor.execute(
             """
-            SELECT 1 FROM sent_items 
+            SELECT 1 FROM sent_items
             WHERE feed_id = ? AND item_id = ?
         """,
             (feed_id, item_id),
@@ -371,10 +375,10 @@ class FeedManager:
         """Load feed configuration from YAML"""
         config_path = os.path.join(self.config_dir, "feeds.yml")
         custom_config = os.getenv("FEEDS_CONFIG")
-        
+
         if custom_config and os.path.exists(custom_config):
             config_path = custom_config
-            
+
         try:
             with open(config_path, "r") as f:
                 self.feed_config = yaml.safe_load(f)
@@ -441,7 +445,7 @@ class FeedManager:
         )
         cursor.execute(
             """
-            UPDATE users SET 
+            UPDATE users SET
                 schedule_hours = ?,
                 last_update = ?
             WHERE hash = ?
@@ -455,7 +459,7 @@ class FeedManager:
         cursor = self.get_db().cursor()
         cursor.execute(
             """
-            SELECT 
+            SELECT
                 f.name,
                 f.url,
                 u.last_update,
@@ -493,7 +497,7 @@ class FeedManager:
             os.makedirs(self.backup_dir, exist_ok=True)
             backup_path = os.path.join(
                 self.backup_dir,
-                f'feed_backup_{datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")}.db',
+                f"feed_backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.db",
             )
             with sqlite3.connect(backup_path) as backup_db:
                 self.get_db().backup(backup_db)
@@ -516,7 +520,7 @@ class FeedManager:
                 print("Invalid backup location")
                 return False
 
-            with sqlite3.connect(backup_path) as backup_db:
+            with sqlite3.connect(backup_path):  # backup_db variable is not used
                 self.get_db().backup(self.get_db())
             return True
         except Exception as e:
