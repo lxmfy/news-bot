@@ -11,7 +11,7 @@ WORKDIR /app
 RUN mkdir -p /app/data /app/backups /root/.reticulum
 
 COPY pyproject.toml poetry.lock /app/
-RUN pip install poetry && poetry install --no-root
+RUN pip install --no-cache-dir poetry && poetry install --no-root
 COPY newsbot /app/newsbot
 RUN poetry install --no-root
 
