@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -20,7 +21,7 @@ class FeedManager:
             default_data_dir = os.path.join(os.getenv("APPDATA"), "lxmfy-news-bot")
         elif os.name == "darwin":  # macOS
             default_data_dir = os.path.join(
-                home, "Library", "Application Support", "lxmfy-news-bot"
+                home, "Library", "Application Support", "lxmfy-news-bot",
             )
         else:  # Linux and others
             default_data_dir = os.path.join(home, ".local", "share", "lxmfy-news-bot")
@@ -30,7 +31,7 @@ class FeedManager:
         self.data_dir = os.getenv("DATA_DIR", default_data_dir)
         self.backup_dir = os.getenv("BACKUP_DIR", default_backup_dir)
         self.config_dir = os.getenv(
-            "CONFIG_DIR", os.path.dirname(os.path.abspath(__file__))
+            "CONFIG_DIR", os.path.dirname(os.path.abspath(__file__)),
         )
 
         # Ensure directories exist
@@ -110,12 +111,12 @@ class FeedManager:
         ]
 
         for version, migration in enumerate(
-            migrations[current_version:], current_version + 1
+            migrations[current_version:], current_version + 1,
         ):
             try:
                 cursor.executescript(migration)
                 cursor.execute(
-                    "INSERT INTO schema_version (version) VALUES (?)", (version,)
+                    "INSERT INTO schema_version (version) VALUES (?)", (version,),
                 )
                 print(f"Applied database migration version {version}")
             except Exception as e:  # noqa: PERF203
@@ -152,7 +153,7 @@ class FeedManager:
         processed_results = []
         for row in results:
             last_update = datetime.fromisoformat(row[7].replace(" ", "T")).replace(
-                tzinfo=timezone.utc
+                tzinfo=timezone.utc,
             )
             processed_results.append(row[:7] + (last_update,))
 
@@ -196,7 +197,7 @@ class FeedManager:
                 feed_id = (
                     cursor.lastrowid
                     or cursor.execute(
-                        "SELECT id FROM feeds WHERE url = ?", (feed_url,)
+                        "SELECT id FROM feeds WHERE url = ?", (feed_url,),
                     ).fetchone()[0]
                 )
 
@@ -278,6 +279,33 @@ class FeedManager:
         self.get_db().commit()
 
     @staticmethod
+    def clean_html(text):
+        """Clean HTML tags and entities from text"""
+        if not text:
+            return ""
+
+        # Remove HTML tags
+        text = re.sub(r"<[^>]+>", "", text)
+
+        # Decode common HTML entities
+        entities = {
+            "&amp;": "&",
+            "&lt;": "<",
+            "&gt;": ">",
+            "&quot;": '"',
+            "&#39;": "'",
+            "&nbsp;": " ",
+        }
+
+        for entity, replacement in entities.items():
+            text = text.replace(entity, replacement)
+
+        # Clean up extra whitespace
+        text = re.sub(r"\s+", " ", text).strip()
+
+        return text
+
+    @staticmethod
     def process_feed(feed_url):
         """Process a feed and return formatted entries"""
         try:
@@ -286,7 +314,7 @@ class FeedManager:
             return [
                 {
                     "title": entry.get("title", "No title"),
-                    "description": entry.get("description", "No description"),
+                    "description": FeedManager.clean_html(entry.get("description", "No description")),
                     "link": entry.get("link", "No link"),
                     "id": entry.get("id", entry.get("link", entry.get("title", ""))),
                 }
@@ -294,7 +322,7 @@ class FeedManager:
             ]
 
         except Exception as e:
-            print(f"Feed processing error for {feed_url}: {str(e)}")
+            print(f"Feed processing error for {feed_url}: {e!s}")
             return []
 
     def mark_sent(self, feed_id, item_id):
@@ -352,7 +380,7 @@ class FeedManager:
                         if downloaded:
                             full_text = trafilatura.extract(downloaded)
                     except Exception as e:
-                        print(f"Full text extraction error: {str(e)}")
+                        print(f"Full text extraction error: {e!s}")
 
                 feed_info["entries"].append(
                     {
@@ -364,13 +392,13 @@ class FeedManager:
                             "published",
                             entry.get("updated", entry.get("created", "Unknown date")),
                         ),
-                    }
+                    },
                 )
 
             return feed_info, None
 
         except Exception as e:
-            print(f"Feed preview error for {feed_url}: {str(e)}")
+            print(f"Feed preview error for {feed_url}: {e!s}")
             return None, str(e)
 
     def load_feed_config(self):
@@ -382,10 +410,10 @@ class FeedManager:
             config_path = custom_config
 
         try:
-            with open(config_path, "r") as f:
+            with open(config_path) as f:
                 self.feed_config = yaml.safe_load(f)
         except Exception as e:
-            print(f"Error loading feed config: {str(e)}")
+            print(f"Error loading feed config: {e!s}")
             self.feed_config = {"groups": {}, "feeds": {}, "default": []}
 
     def get_feed_group(self, group_name):
@@ -484,7 +512,7 @@ class FeedManager:
             if last_update_str:
                 try:
                     last_update = datetime.fromisoformat(
-                        last_update_str.replace(" ", "T")
+                        last_update_str.replace(" ", "T"),
                     ).replace(tzinfo=timezone.utc)
                 except ValueError:
                     pass
@@ -552,7 +580,7 @@ class FeedManager:
         cursor.execute("PRAGMA page_size")
         page_size = cursor.fetchone()[0]
         stats["db_size"] = round(
-            (page_count * page_size) / (1024 * 1024), 2
+            (page_count * page_size) / (1024 * 1024), 2,
         )  # Size in MB
 
         return stats

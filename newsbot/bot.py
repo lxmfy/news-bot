@@ -9,28 +9,32 @@ from .feed import FeedManager
 
 
 class NewsBot:
-    VERSION = "0.3.0"
+    """LXMFy News Bot class for managing RSS feeds, subscriptions, and periodic updates.
+    """
+
+    VERSION = "0.6.0"
     DESCRIPTION = "LXMFy News Bot\nUsing RSS and trafilatura to fetch full-text"
 
     def __init__(self):
-        # Get configuration from environment variables with platform-specific defaults
+        """Initialize the NewsBot, configure environment, and set up scheduler and commands.
+        """
         home = os.path.expanduser("~")
 
-        # Platform-specific reticulum paths
-        if os.name == "nt":  # Windows
+        # Determine platform-specific reticulum directory
+        if os.name == "nt":
             reticulum_dir = os.path.join(os.getenv("APPDATA"), "reticulum")
-        elif os.name == "darwin":  # macOS
+        elif os.name == "darwin":
             reticulum_dir = os.path.join(
-                home, "Library", "Application Support", "reticulum"
+                home, "Library", "Application Support", "reticulum",
             )
-        else:  # Linux and others
+        else:
             reticulum_dir = os.path.join(home, ".reticulum")
 
         os.makedirs(reticulum_dir, exist_ok=True)
 
         # Initialize LXMFBot with environment variables
         self.bot = LXMFBot(
-            name=os.getenv("BOT_NAME", f"LXMFy News Bot v{self.VERSION}"),
+            name=os.getenv("BOT_NAME", "LXMFy News Bot"),
             announce=int(os.getenv("BOT_ANNOUNCE", "600")),
             announce_immediately=os.getenv("BOT_ANNOUNCE_IMMEDIATE", "false").lower()
             == "true",
@@ -47,37 +51,44 @@ class NewsBot:
             == "true",
             storage_type=os.getenv("BOT_STORAGE_TYPE", "sqlite"),
             storage_path=os.getenv(
-                "BOT_STORAGE_PATH", f"{os.getenv('DATA_DIR', './app/data')}/bot.db"
+                "BOT_STORAGE_PATH", f"{os.getenv('DATA_DIR', './app/data')}/bot.db",
             ),
             first_message_enabled=os.getenv("BOT_FIRST_MESSAGE_ENABLED", "true").lower()
             == "true",
             event_logging_enabled=os.getenv(
-                "BOT_EVENT_LOGGING_ENABLED", "false"
+                "BOT_EVENT_LOGGING_ENABLED", "false",
             ).lower()
             == "true",
             max_logged_events=int(os.getenv("BOT_MAX_LOGGED_EVENTS", "1000")),
             event_middleware_enabled=os.getenv(
-                "BOT_EVENT_MIDDLEWARE_ENABLED", "false"
+                "BOT_EVENT_MIDDLEWARE_ENABLED", "false",
             ).lower()
             == "true",
             announce_enabled=os.getenv("BOT_ANNOUNCE_ENABLED", "true").lower()
+            == "true",
+            signature_verification_enabled=os.getenv("BOT_SIGNATURE_VERIFICATION_ENABLED", "false").lower()
+            == "true",
+            require_message_signatures=os.getenv("BOT_REQUIRE_MESSAGE_SIGNATURES", "false").lower()
             == "true",
         )
 
         self.feed_manager = FeedManager()
         self.setup_commands()
 
-        # Initialize and start the task scheduler for periodic feed checking
+        # Set up periodic feed checking using a task scheduler
         self.scheduler = TaskScheduler(self.bot)
 
         @self.scheduler.schedule(name="feed_check", cron_expr="*/5 * * * *")
         def scheduled_feed_check():
+            """Periodically check feeds for updates.
+            """
             self._run_feed_cycle()
 
         self.scheduler.start()
 
     def setup_commands(self):
-        # Admin commands
+        """Register all bot commands, including admin and user commands.
+        """
         @self.bot.command(
             name="backup",
             description="Backup the database",
@@ -85,6 +96,7 @@ class NewsBot:
             admin_only=True,
         )
         def backup_db(ctx):
+            """Backup the database to a file."""
             if not ctx.is_admin:
                 ctx.reply("This command is only available to administrators")
                 return
@@ -103,6 +115,7 @@ class NewsBot:
             admin_only=True,
         )
         def restore_db(ctx):
+            """Restore the database from a backup file."""
             if not ctx.is_admin:
                 ctx.reply("This command is only available to administrators")
                 return
@@ -124,6 +137,7 @@ class NewsBot:
             admin_only=True,
         )
         def db_version(ctx):
+            """Show the current database schema version."""
             version = self.feed_manager.get_db_version()
             ctx.reply(f"Database schema version: {version}")
 
@@ -134,6 +148,7 @@ class NewsBot:
             admin_only=True,
         )
         def show_stats(ctx):
+            """Display statistics about users, feeds, and articles."""
             stats = self.feed_manager.get_stats()
             ctx.reply(f"""Bot Statistics:
 Total users: {stats["users"]}
@@ -141,17 +156,20 @@ Total feeds: {stats["feeds"]}
 Total articles: {stats["articles"]}
 Database size: {stats["db_size"]}MB""")
 
-        # Regular user commands remain unchanged
         @self.bot.command(
             name="version",
             description="Show bot version and information",
             category="System",
         )
         def version(ctx):
+            """Show the bot's version and configuration information."""
+            sig_status = "enabled" if self.bot.config.signature_verification_enabled else "disabled"
             ctx.reply(f"""Version {self.VERSION} - {self.DESCRIPTION}
 
+Signature verification: {sig_status}
 Type 'help' for available commands
-Type 'feeds' to see available feed categories""")
+Type 'feeds' to see available feed categories
+Type 'news' for instant latest news""")
 
         @self.bot.command(
             name="feed",
@@ -159,6 +177,7 @@ Type 'feeds' to see available feed categories""")
             usage="feed <feed_url>",
         )
         def preview_feed(ctx):
+            """Preview the latest 5 entries from a given feed URL."""
             if not ctx.args:
                 ctx.reply("Usage: feed <feed_url>")
                 return
@@ -199,6 +218,8 @@ Link: {entry["link"]}"""
             ],
         )
         def subscribe(ctx):
+            """Subscribe the user to one or more RSS feeds, or to a category of feeds.
+            """
             if len(ctx.args) < 1:
                 ctx.reply("Usage: subscribe <feed_url> [name] [feed_url2] [name2] ...")
                 return
@@ -210,10 +231,10 @@ Link: {entry["link"]}"""
                 feeds = self.feed_manager.parse_feed_input(category)
                 if not feeds:
                     categories = list(
-                        self.feed_manager.feed_config.get("groups", {}).keys()
+                        self.feed_manager.feed_config.get("groups", {}).keys(),
                     )
                     ctx.reply(
-                        f"Category '{category}' not found. Available categories: {', '.join(categories)}"
+                        f"Category '{category}' not found. Available categories: {', '.join(categories)}",
                     )
                     return
                 success, results = self.feed_manager.add_subscription(
@@ -249,7 +270,7 @@ Link: {entry["link"]}"""
                 names.append(" ".join(names) if names else current_url)
 
             success, results = self.feed_manager.add_subscription(
-                ctx.sender, urls, names
+                ctx.sender, urls, names,
             )
 
             response = []
@@ -267,6 +288,7 @@ Link: {entry["link"]}"""
             usage="unsubscribe <feed_name>",
         )
         def unsubscribe(ctx):
+            """Unsubscribe the user from a feed by name."""
             if not ctx.args:
                 ctx.reply("Usage: unsubscribe <feed_name>")
                 return
@@ -278,9 +300,11 @@ Link: {entry["link"]}"""
                 ctx.reply(f"You're not subscribed to: {name}")
 
         @self.bot.command(
-            name="list", description="List your subscribed feeds and next update times"
+            name="list", description="List your subscribed feeds and next update times",
         )
         def list_feeds(ctx):
+            """List the user's current subscriptions and the time until the next update.
+            """
             feeds = self.feed_manager.get_user_subscriptions_with_time(ctx.sender)
             if feeds:
                 response = "Your subscriptions:\n"
@@ -293,17 +317,16 @@ Link: {entry["link"]}"""
 
                         if hours_remaining <= 0:
                             time_info = "Update pending..."
+                        elif hours_remaining > 24:
+                            days = hours_remaining / 24
+                            time_info = f"Next update in {days:.1f} days"
+                        elif hours_remaining < 1:
+                            mins = hours_remaining * 60
+                            time_info = f"Next update in {mins:.0f} minutes"
                         else:
-                            if hours_remaining > 24:
-                                days = hours_remaining / 24
-                                time_info = f"Next update in {days:.1f} days"
-                            elif hours_remaining < 1:
-                                mins = hours_remaining * 60
-                                time_info = f"Next update in {mins:.0f} minutes"
-                            else:
-                                time_info = (
-                                    f"Next update in {hours_remaining:.1f} hours"
-                                )
+                            time_info = (
+                                f"Next update in {hours_remaining:.1f} hours"
+                            )
                     else:
                         time_info = "First update pending"
 
@@ -320,6 +343,7 @@ Link: {entry["link"]}"""
             examples=["timezone UTC", "timezone America/New_York"],
         )
         def set_timezone(ctx):
+            """Set the user's timezone for scheduling updates."""
             if not ctx.args:
                 ctx.reply("Usage: timezone <timezone>")
                 return
@@ -331,7 +355,7 @@ Link: {entry["link"]}"""
                 ctx.reply(f"Timezone set to: {tz}")
             except Exception:
                 ctx.reply(
-                    "Invalid timezone. Use format like 'UTC' or 'America/New_York'"
+                    "Invalid timezone. Use format like 'UTC' or 'America/New_York'",
                 )
 
         @self.bot.command(
@@ -341,6 +365,8 @@ Link: {entry["link"]}"""
             examples=["time 09:00"],
         )
         def set_time(ctx):
+            """Set the daily update time for the user.
+            """
             if not ctx.args or not ctx.args[0]:
                 ctx.reply("Usage: time HH:MM")
                 return
@@ -367,18 +393,20 @@ Link: {entry["link"]}"""
             ],
         )
         def default_feeds(ctx):
+            """Subscribe the user to default feeds or a specific category.
+            """
             category = " ".join(ctx.args).lower() if ctx.args else "default"
             feeds = self.feed_manager.parse_feed_input(category)
 
             if not feeds:
                 categories = list(self.feed_manager.feed_config["groups"].keys())
                 ctx.reply(
-                    f"Available categories: {', '.join(categories)}\nUse: default <category>"
+                    f"Available categories: {', '.join(categories)}\nUse: default <category>",
                 )
                 return
 
             success, results = self.feed_manager.add_subscription(
-                ctx.sender, [f["url"] for f in feeds], [f["name"] for f in feeds]
+                ctx.sender, [f["url"] for f in feeds], [f["name"] for f in feeds],
             )
 
             response = []
@@ -396,8 +424,9 @@ Link: {entry["link"]}"""
             usage="feeds [category]",
         )
         def list_available_feeds(ctx):
+            """List all available feed categories or feeds in a specific category.
+            """
             if not ctx.args:
-                # List all categories
                 categories = list(self.feed_manager.feed_config["groups"].keys())
                 named_feeds = list(self.feed_manager.feed_config["feeds"].keys())
 
@@ -421,12 +450,54 @@ Link: {entry["link"]}"""
             ctx.reply(response)
 
         @self.bot.command(
+            name="news",
+            description="Get latest news instantly from default feeds",
+            category="News",
+        )
+        def get_news(ctx):
+            """Send latest news from default feeds immediately.
+            """
+            default_feeds = self.feed_manager.get_default_feeds()
+
+            if not default_feeds:
+                ctx.reply("No default feeds configured")
+                return
+
+            total_sent = 0
+            for feed in default_feeds[:3]:  # Limit to 3 feeds to avoid spam
+                feed_url = feed["url"]
+                feed_name = feed["name"]
+
+                entries = self.feed_manager.process_feed(feed_url)
+                if not entries:
+                    continue
+
+                # Send the latest entry from each feed
+                latest_entry = entries[0]
+                message = f"""
+{feed_name}
+
+{latest_entry["title"]}
+
+{latest_entry["description"]}
+
+Link: {latest_entry["link"]}
+"""
+                ctx.reply(message, title=f"Latest: {feed_name}")
+                total_sent += 1
+
+            if total_sent == 0:
+                ctx.reply("Unable to fetch news from default feeds")
+
+        @self.bot.command(
             name="schedule",
             description="Set update schedule in hours (1-72)",
             usage="schedule <hours>",
             examples=["schedule 6", "schedule 12", "schedule 24"],
         )
         def set_schedule(ctx):
+            """Set the update schedule interval in hours for the user.
+            """
             if not ctx.args or not ctx.args[0].isdigit():
                 ctx.reply("Usage: schedule <hours> (1-72)")
                 return
@@ -440,6 +511,8 @@ Link: {entry["link"]}"""
             ctx.reply(f"Updates scheduled every {hours} hours")
 
     def _run_feed_cycle(self):
+        """Run a cycle to check all active subscriptions and send updates if needed.
+        """
         try:
             now = datetime.now(timezone.utc)
             for (
@@ -452,25 +525,27 @@ Link: {entry["link"]}"""
                 schedule_hours,
                 last_update,
             ) in self.feed_manager.get_active_subscriptions():
-                # Skip if no last update (new user)
+                # If no last update (new user), send updates immediately
                 if not last_update:
                     self.send_feed_updates(user_hash, feed_id, feed_url, feed_name)
                     continue
 
-                # last_update should already be timezone-aware
+                # Ensure last_update is timezone-aware
                 if not last_update.tzinfo:
                     last_update = last_update.replace(tzinfo=timezone.utc)
 
                 # Calculate hours since last update
                 hours_since_update = (now - last_update).total_seconds() / 3600
 
-                # Check if it's time for an update
+                # Send updates if the schedule interval has passed
                 if hours_since_update >= (schedule_hours or 24):
                     self.send_feed_updates(user_hash, feed_id, feed_url, feed_name)
         except Exception as e:
-            print(f"Scheduled feed check error: {str(e)}")
+            print(f"Scheduled feed check error: {e!s}")
 
     def send_feed_updates(self, user_hash, feed_id, feed_url, feed_name):
+        """Send new feed entries to the user and mark them as sent.
+        """
         try:
             entries = self.feed_manager.process_feed(feed_url)
 
@@ -503,13 +578,17 @@ Link: {entry["link"]}
                 self.feed_manager.get_db().commit()
 
         except Exception as e:
-            print(f"Error sending feed updates: {str(e)}")
+            print(f"Error sending feed updates: {e!s}")
 
     def run(self):
+        """Start the bot's main event loop.
+        """
         self.bot.run()
 
 
 def main():
+    """Entry point for running the NewsBot.
+    """
     bot = NewsBot()
     bot.run()
 
