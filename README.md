@@ -17,16 +17,17 @@ A LXMFy News Bot for the [Reticulum Network](https://github.com/markqvist/Reticu
 
 ```bash
 pip install lxmfy-news-bot
-```
 
-or
-
-```bash
 pipx install lxmfy-news-bot
 ```
 
-The bot will store its data in `~/.local/share/lxmfy-news-bot/` 
+Git:
 
+```bash
+pipx install git+https://github.com/lxmfy/news-bot.git
+```
+
+The bot will store its data in `~/.local/share/lxmfy-news-bot/` 
 
 ## Usage
 
@@ -39,7 +40,7 @@ lxmfy-news-bot
 The bot supports various environment variables for customization. See `.env-example` for a complete list of all available configuration options.
 
 ### Basic Configuration
-- `BOT_NAME`: Bot display name (default: "LXMFy News Bot v0.6.0")
+- `BOT_NAME`: Bot display name (default: "LXMFy News Bot")
 - `BOT_ANNOUNCE`: Announcement interval in seconds (default: 600)
 - `BOT_PREFIX`: Command prefix (default: "")
 - `BOT_ADMINS`: Comma-separated list of admin hashes
