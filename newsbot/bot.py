@@ -12,7 +12,7 @@ class NewsBot:
     """LXMFy News Bot class for managing RSS feeds, subscriptions, and periodic updates.
     """
 
-    VERSION = "0.6.0"
+    VERSION = "0.7.0"
     DESCRIPTION = "LXMFy News Bot\nUsing RSS and trafilatura to fetch full-text"
 
     def __init__(self):
