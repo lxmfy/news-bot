@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytz
 from lxmfy import LXMFBot
@@ -308,7 +308,7 @@ Link: {entry["link"]}"""
             feeds = self.feed_manager.get_user_subscriptions_with_time(ctx.sender)
             if feeds:
                 response = "Your subscriptions:\n"
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
 
                 for name, url, last_update, schedule_hours in feeds:
                     if last_update:
@@ -376,7 +376,7 @@ Link: {entry["link"]}"""
                 # function uses parameterized queries, preventing SQL injection.
                 time = datetime.strptime(ctx.args[0], "%H:%M").strftime("%H:%M")
                 self.feed_manager.update_user_time(ctx.sender, time)
-                ctx.reply(f"Update time set to: {time}")
+                ctx.reply(f"Update time set to: {time}")  # noqa: S608
             except ValueError:
                 ctx.reply("Invalid time format. Use HH:MM (24-hour format)")
 
@@ -514,7 +514,7 @@ Link: {latest_entry["link"]}
         """Run a cycle to check all active subscriptions and send updates if needed.
         """
         try:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             for (
                 user_hash,
                 tz,
@@ -532,7 +532,7 @@ Link: {latest_entry["link"]}
 
                 # Ensure last_update is timezone-aware
                 if not last_update.tzinfo:
-                    last_update = last_update.replace(tzinfo=timezone.utc)
+                    last_update = last_update.replace(tzinfo=UTC)
 
                 # Calculate hours since last update
                 hours_since_update = (now - last_update).total_seconds() / 3600
@@ -573,7 +573,7 @@ Link: {entry["link"]}
                     SET last_update = ?
                     WHERE hash = ?
                 """,
-                    (datetime.now(timezone.utc), user_hash),
+                    (datetime.now(UTC), user_hash),
                 )
                 self.feed_manager.get_db().commit()
 

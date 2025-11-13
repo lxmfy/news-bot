@@ -2,7 +2,7 @@ import os
 import re
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import feedparser
 import trafilatura
@@ -119,7 +119,7 @@ class FeedManager:
                     "INSERT INTO schema_version (version) VALUES (?)", (version,),
                 )
                 print(f"Applied database migration version {version}")
-            except Exception as e:  # noqa: PERF203
+            except Exception as e:
                 # The try-except block is intentionally inside the loop
                 # to ensure transactional integrity for each migration.
                 # If a migration fails, the transaction is rolled back,
@@ -153,7 +153,7 @@ class FeedManager:
         processed_results = []
         for row in results:
             last_update = datetime.fromisoformat(row[7].replace(" ", "T")).replace(
-                tzinfo=timezone.utc,
+                tzinfo=UTC,
             )
             processed_results.append(row[:7] + (last_update,))
 
@@ -175,7 +175,7 @@ class FeedManager:
         success_count = 0
         results = []
 
-        for feed_url, feed_name in zip(feed_urls, feed_names):
+        for feed_url, feed_name in zip(feed_urls, feed_names, strict=False):
             cursor = self.get_db().cursor()
             try:
                 feed_info, error = self.preview_feed(feed_url)
@@ -191,7 +191,7 @@ class FeedManager:
                     INSERT OR IGNORE INTO feeds (url, name, last_check)
                     VALUES (?, ?, ?)
                 """,
-                    (feed_url, feed_name, datetime.now(timezone.utc)),
+                    (feed_url, feed_name, datetime.now(UTC)),
                 )
 
                 feed_id = (
@@ -333,11 +333,11 @@ class FeedManager:
             INSERT INTO sent_items (feed_id, item_id, sent_date)
             VALUES (?, ?, ?)
         """,
-            (feed_id, item_id, datetime.now(timezone.utc)),
+            (feed_id, item_id, datetime.now(UTC)),
         )
         self.get_db().commit()
 
-    def is_sent(self, feed_id, item_id):  # noqa: PYL-R0201
+    def is_sent(self, feed_id, item_id):  # noqa: PLR6301
         """Check if an item was already sent"""
         # This method uses self.get_db() and thus cannot be a static method.
         cursor = self.get_db().cursor()
@@ -480,7 +480,7 @@ class FeedManager:
                 last_update = ?
             WHERE hash = ?
         """,
-            (hours, datetime.now(timezone.utc), user_hash),
+            (hours, datetime.now(UTC), user_hash),
         )
         self.get_db().commit()
 
@@ -513,7 +513,7 @@ class FeedManager:
                 try:
                     last_update = datetime.fromisoformat(
                         last_update_str.replace(" ", "T"),
-                    ).replace(tzinfo=timezone.utc)
+                    ).replace(tzinfo=UTC)
                 except ValueError:
                     pass
 
@@ -527,7 +527,7 @@ class FeedManager:
             os.makedirs(self.backup_dir, exist_ok=True)
             backup_path = os.path.join(
                 self.backup_dir,
-                f"feed_backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.db",
+                f"feed_backup_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.db",
             )
             with sqlite3.connect(backup_path) as backup_db:
                 self.get_db().backup(backup_db)
